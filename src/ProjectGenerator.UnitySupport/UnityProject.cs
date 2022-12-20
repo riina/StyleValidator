@@ -1,12 +1,7 @@
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
 using System.Text.Json;
 using System.Text.RegularExpressions;
-using ProjectGenerator.UnitySupport;
 
-namespace ProjectGenerator;
+namespace ProjectGenerator.UnitySupport;
 
 public partial class UnityProject : ProjectCollection
 {

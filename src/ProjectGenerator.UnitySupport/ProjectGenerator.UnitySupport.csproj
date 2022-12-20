@@ -6,9 +6,9 @@
     <Nullable>enable</Nullable>
     <LangVersion>11</LangVersion>
   </PropertyGroup>
-
+  
   <ItemGroup>
-    <ProjectReference Include="../ProjectGenerator/ProjectGenerator.csproj"/>
+    <ProjectReference Include="../ProjectGenerator/ProjectGenerator.csproj" />
   </ItemGroup>
 
 </Project>

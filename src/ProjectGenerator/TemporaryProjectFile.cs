@@ -1,6 +1,3 @@
-using System;
-using System.IO;
-
 namespace ProjectGenerator;
 
 public class TemporaryProjectFile : ProjectFile

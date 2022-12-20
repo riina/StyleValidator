@@ -1,8 +1,4 @@
-using System;
-using System.Collections.Generic;
-using System.IO;
-
-namespace ProjectGenerator;
+namespace ProjectGenerator.UnitySupport;
 
 public record LocalUnityProjectPackageEntry(string Name, string FullPath) : UnityProjectPackageEntry(Name)
 {

@@ -1,5 +1,3 @@
-using System;
-
 namespace ProjectGenerator;
 
 public class SolutionContext : IDisposable

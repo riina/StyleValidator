@@ -1,6 +1,4 @@
-using System.Collections.Generic;
-
-namespace ProjectGenerator;
+namespace ProjectGenerator.UnitySupport;
 
 public abstract record UnityProjectPackageEntry(string Name)
 {

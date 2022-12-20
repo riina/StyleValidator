@@ -9,6 +9,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "StyleVerifier", "StyleVerif
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "styver", "styver\styver.csproj", "{880C90A0-9EBF-444F-92DB-4E9BB5D81694}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ProjectGenerator.UnitySupport", "ProjectGenerator.UnitySupport\ProjectGenerator.UnitySupport.csproj", "{A5FBD3EE-3F7A-4CF7-BFB4-FB5F085A6F8B}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -30,5 +32,9 @@ Global
 		{880C90A0-9EBF-444F-92DB-4E9BB5D81694}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{880C90A0-9EBF-444F-92DB-4E9BB5D81694}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{880C90A0-9EBF-444F-92DB-4E9BB5D81694}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A5FBD3EE-3F7A-4CF7-BFB4-FB5F085A6F8B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A5FBD3EE-3F7A-4CF7-BFB4-FB5F085A6F8B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A5FBD3EE-3F7A-4CF7-BFB4-FB5F085A6F8B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A5FBD3EE-3F7A-4CF7-BFB4-FB5F085A6F8B}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal

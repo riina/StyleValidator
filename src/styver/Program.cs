@@ -1,6 +1,6 @@
 ﻿// See https://aka.ms/new-console-template for more information
 
-using ProjectGenerator;
+using ProjectGenerator.UnitySupport;
 
 Console.WriteLine("Hello, World!");
 
