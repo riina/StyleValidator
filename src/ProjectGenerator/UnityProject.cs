@@ -1,9 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Text.Json;
-using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
+using ProjectGenerator.UnitySupport;
 
 namespace ProjectGenerator;
 
@@ -39,8 +40,6 @@ public partial class UnityProject : ProjectCollection
         return new UnityProject(entries.ToArray());
     }
 
-    private record UnityProjectManifest([property: JsonPropertyName("dependencies")] IReadOnlyDictionary<string, string> Dependencies);
-
     [GeneratedRegex("file:(?<path>.+)")]
     private static partial Regex FileEntryRegex();
 
@@ -48,6 +47,7 @@ public partial class UnityProject : ProjectCollection
     {
         var created = new List<ProjectFile>();
         List<string> asmDefPaths = new(), asmRefPaths = new();
+        Dictionary<string, TempProjectData> tempProjects = new();
         Dictionary<string, AsmDefEntry> asmDefs = new();
         Dictionary<string, List<AsmDefEntry>> asmDefReferences = new();
         Dictionary<string, List<string>> unknownAsmDefReferences = new();
@@ -64,14 +64,15 @@ public partial class UnityProject : ProjectCollection
             }
             foreach (string asmDefPath in asmDefPaths)
             {
-                keyPaths.Add(Path.GetDirectoryName(asmDefPath) ?? throw new InvalidDataException());
+                string directory = Path.GetDirectoryName(asmDefPath) ?? throw new InvalidDataException();
+                keyPaths.Add(directory);
                 string guid = ExtractMetaGuid(asmDefPath);
                 AsmDef asmDef;
                 using (var stream = File.OpenRead(asmDefPath))
                 {
                     asmDef = JsonSerializer.Deserialize<AsmDef>(stream) ?? throw new InvalidDataException();
                 }
-                var entry = new AsmDefEntry(asmDefPath, guid, asmDef);
+                var entry = new AsmDefEntry(directory, guid, asmDef);
                 asmDefs.Add(guid, entry);
                 asmDefReferences.Add(guid, new List<AsmDefEntry>());
                 unknownAsmDefReferences.Add(guid, new List<string>());
@@ -85,10 +86,12 @@ public partial class UnityProject : ProjectCollection
                     collection.Add(guid);
                 }
                 asmRefs.Add(guid, new List<AsmRefEntry>());
+                tempProjects.Add(guid, new TempProjectData(GenerateTempPath(guid, ".csproj")));
             }
             foreach (string asmRefPath in asmRefPaths)
             {
-                keyPaths.Add(Path.GetDirectoryName(asmRefPath) ?? throw new InvalidDataException());
+                string directory = Path.GetDirectoryName(asmRefPath) ?? throw new InvalidDataException();
+                keyPaths.Add(directory);
                 string guid = ExtractMetaGuid(asmRefPath);
                 AsmRef asmRef;
                 using (var stream = File.OpenRead(asmRefPath))
@@ -96,7 +99,7 @@ public partial class UnityProject : ProjectCollection
                     asmRef = JsonSerializer.Deserialize<AsmRef>(stream) ?? throw new InvalidDataException();
                 }
                 string referenceGuid = ParseAsmGuid(asmRef.Reference);
-                AsmRefEntry asmRefEntry = new(asmRefPath, guid, referenceGuid);
+                AsmRefEntry asmRefEntry = new(directory, guid, referenceGuid);
                 if (!asmRefs.TryGetValue(referenceGuid, out var collection))
                 {
                     collection = asmRefs[referenceGuid] = new List<AsmRefEntry>();
@@ -110,7 +113,6 @@ public partial class UnityProject : ProjectCollection
                     throw new IOException($"Unknown source assembly for {asmRef.Key}");
                 }
             }
-            // TODO check unknown asmdef references
             foreach (var pair in asmDefReferencesInv)
             {
                 if (asmDefs.TryGetValue(pair.Key, out var knownAsmDefEntry))
@@ -130,20 +132,21 @@ public partial class UnityProject : ProjectCollection
             }
             foreach (var asmDef in asmDefs.Values)
             {
-                // TODO
-                Console.WriteLine(asmDef.Path);
-                foreach (var asmDefReference in asmDefReferences[asmDef.Guid])
-                {
-                    Console.WriteLine(" >!" + asmDefReference.Path);
-                }
-                foreach (string unknownAsmDefReference in unknownAsmDefReferences[asmDef.Guid])
-                {
-                    Console.WriteLine(" >?" + unknownAsmDefReference);
-                }
+                var tempProject = tempProjects[asmDef.Guid];
+                tempProject.ReferencedCsprojPaths.AddRange(asmDefReferences[asmDef.Guid].Select(v => tempProjects[v.Guid].DestinationCsprojPath));
+                AddSourceFiles(asmDef.Path, keyPaths, tempProject.SourceFiles, "*.cs");
                 foreach (var asmRef in asmRefs[asmDef.Guid])
                 {
-                    Console.WriteLine(" -" + asmRef.Path);
+                    AddSourceFiles(asmRef.Path, keyPaths, tempProject.SourceFiles, "*.cs");
                 }
+                Console.WriteLine(asmDef.Path);
+                foreach (string file in tempProject.SourceFiles)
+                {
+                    Console.WriteLine(" " + file);
+                }
+                // currently not supporting referenced assemblies
+                // currently not supporting referenced but unresolved asmdefs
+                // TODO process defines
             }
         }
         catch (Exception e)
@@ -169,6 +172,32 @@ public partial class UnityProject : ProjectCollection
         return new UnitySolutionContext(created.ToArray());
     }
 
+    private static void AddSourceFiles(string directory, IReadOnlySet<string> keyPaths, ICollection<string> paths, string searchPattern)
+    {
+        foreach (string file in Directory.GetFiles(directory, searchPattern))
+        {
+            paths.Add(file);
+        }
+        foreach (string subDirectory in Directory.GetDirectories(directory))
+        {
+            AddSubSourceFiles(subDirectory, keyPaths, paths, searchPattern);
+        }
+    }
+
+    private static void AddSubSourceFiles(string directory, IReadOnlySet<string> keyPaths, ICollection<string> paths, string searchPattern)
+    {
+        if (keyPaths.Contains(directory))
+        {
+            return;
+        }
+        AddSourceFiles(directory, keyPaths, paths, searchPattern);
+    }
+
+    private static string GenerateTempPath(string baseGuid, string ext)
+    {
+        return Path.Combine(Path.GetTempPath(), $"{baseGuid}_{Guid.NewGuid()}{ext}");
+    }
+
     private static string ExtractMetaGuid(string assetPath)
     {
         string metaPath = $"{assetPath}.meta";
@@ -191,17 +220,6 @@ public partial class UnityProject : ProjectCollection
         }
         return referenceGuidMatch.Groups["guid"].Value.ToLowerInvariant();
     }
-
-    private record AsmDefEntry(string Path, string Guid, AsmDef Value);
-
-    private record AsmRefEntry(string Path, string Guid, string ReferenceGuid);
-
-    private record AsmDef([property: JsonPropertyName("name")] string Name, [property: JsonPropertyName("references")] IReadOnlyList<string> References, [property: JsonPropertyName("versionDefines")] IReadOnlyList<AsmDef.VersionDefine> VersionDefines)
-    {
-        public record VersionDefine([property: JsonPropertyName("name")] string Name, [property: JsonPropertyName("expression")] string Expression, [property: JsonPropertyName("define")] string Define);
-    }
-
-    private record AsmRef([property: JsonPropertyName("reference")] string Reference);
 
     [GeneratedRegex("guid: (?<guid>[A-Fa-f0-9]{16})")]
     private static partial Regex GuidRegex();

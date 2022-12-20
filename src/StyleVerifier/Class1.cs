@@ -1,6 +1,4 @@
-﻿using System;
-
-namespace StyleVerifier;
+﻿namespace StyleVerifier;
 
 public class Class1
 {

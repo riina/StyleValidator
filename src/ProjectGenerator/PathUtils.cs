@@ -5,7 +5,7 @@ namespace ProjectGenerator;
 
 internal static class PathUtils
 {
-    private static bool IsContainedPath(ReadOnlySpan<char> basePath, ReadOnlySpan<char> subPath)
+    public static bool IsContainedPath(ReadOnlySpan<char> basePath, ReadOnlySpan<char> subPath)
     {
         while (Path.GetDirectoryName(subPath) is { Length: > 0 } dir)
         {
