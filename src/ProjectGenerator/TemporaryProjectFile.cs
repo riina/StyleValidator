@@ -2,6 +2,18 @@ namespace ProjectGenerator;
 
 public class TemporaryProjectFile : ProjectFile
 {
+    public FileStream FileStream
+    {
+        get
+        {
+            if (_disposed)
+            {
+                throw new ObjectDisposedException(nameof(TemporaryProjectFile));
+            }
+            return _fileStream;
+        }
+    }
+
     private readonly FileStream _fileStream;
     private bool _disposed;
 

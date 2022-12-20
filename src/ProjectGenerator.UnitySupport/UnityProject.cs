@@ -1,3 +1,4 @@
+using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 
@@ -146,6 +147,7 @@ public partial class UnityProject : ProjectCollection
                 {
                     AddSourceFiles(asmRef.Path, keyPaths, tempProject.SourceFiles, "*.cs");
                 }
+                // currently not supporting inbuilt version defines
                 foreach (var versionDefine in asmDef.Value.VersionDefines)
                 {
                     // currently not supporting referenced but unresolved packages
@@ -165,20 +167,62 @@ public partial class UnityProject : ProjectCollection
                         tempProject.FailedDefines.Add(versionDefine.Define);
                     }
                 }
-                Console.WriteLine(asmDef.Path);
-                foreach (string define in tempProject.Defines)
+                //var tempProjectFile = new TemporaryProjectFile(tempProject.DestinationCsprojPath);
+                //using var writer = new StreamWriter(tempProjectFile.FileStream, leaveOpen: true);
+                var writer = new StringWriter();
+                writer.WriteLine("""
+                <Project Sdk="Microsoft.NET.Sdk">
+
+                  <PropertyGroup>
+                    <TargetFramework>netstandard2.1</TargetFramework>
+                    <LangVersion>9</LangVersion>
+                  </PropertyGroup>
+                """);
+                if (tempProject.Defines.Count != 0)
                 {
-                    Console.WriteLine(" +" + define);
+                    string defineConstantsString = new StringBuilder().AppendJoin(";", tempProject.Defines).ToString();
+                    writer.WriteLine($"""
+
+                  <PropertyGroup>
+                    <DefineConstants>{defineConstantsString}</DefineConstants>
+                  </PropertyGroup>
+                """);
                 }
-                foreach (string define in tempProject.FailedDefines)
+                if (tempProject.ReferencedCsprojPaths.Count != 0)
                 {
-                    Console.WriteLine(" -" + define);
+                    writer.WriteLine("""
+
+                  <ItemGroup>
+                """);
+                    foreach (string referencedCsprojPath in tempProject.ReferencedCsprojPaths)
+                    {
+                        writer.WriteLine($"""
+                    <ProjectReference Include="{referencedCsprojPath}"/>
+                """);
+                    }
+                    writer.WriteLine("""
+                  </ItemGroup>
+                """);
                 }
-                foreach (string file in tempProject.SourceFiles)
+                writer.WriteLine("""
+
+                  <ItemGroup>
+                """);
+                foreach (string sourceFile in tempProject.SourceFiles)
                 {
-                    Console.WriteLine(" >" + file);
+                    writer.WriteLine($"""
+                    <Compile Include="{sourceFile}"/>
+                """);
                 }
-                // TODO process defines
+                writer.WriteLine("""
+                  </ItemGroup>
+                """);
+                writer.WriteLine("""
+
+                </Project>
+                """);
+                Console.WriteLine(writer.ToString());
+                // TODO
             }
         }
         catch (Exception e)
@@ -242,7 +286,6 @@ public partial class UnityProject : ProjectCollection
                 }
             }
             return false;
-            // TODO
         }
         if (VersionDefineExactRegex().Match(versionDefineExpression) is { Success: true } versionDefineExactRegex)
         {
