@@ -77,14 +77,10 @@ public partial class UnityProject : ProjectCollection
                 unknownAsmDefReferences.Add(guid, new List<string>());
                 foreach (string reference in asmDef.References)
                 {
-                    if (AsmGuidRegex().Match(reference) is not { Success: true } referenceGuidMatch)
+                    string referenceGuid = ParseAsmGuid(reference);
+                    if (!asmDefReferencesInv.TryGetValue(referenceGuid, out var collection))
                     {
-                        throw new InvalidDataException();
-                    }
-                    string referenceGuidStr = referenceGuidMatch.Groups["guid"].Value;
-                    if (!asmDefReferencesInv.TryGetValue(referenceGuidStr, out var collection))
-                    {
-                        collection = asmDefReferencesInv[referenceGuidStr] = new List<string>();
+                        collection = asmDefReferencesInv[referenceGuid] = new List<string>();
                     }
                     collection.Add(guid);
                 }
@@ -99,11 +95,7 @@ public partial class UnityProject : ProjectCollection
                 {
                     asmRef = JsonSerializer.Deserialize<AsmRef>(stream) ?? throw new InvalidDataException();
                 }
-                if (AsmGuidRegex().Match(asmRef.Reference) is not { Success: true } asmRefGuid)
-                {
-                    throw new InvalidDataException();
-                }
-                string referenceGuid = asmRefGuid.Groups["guid"].Value.ToLowerInvariant();
+                string referenceGuid = ParseAsmGuid(asmRef.Reference);
                 AsmRefEntry asmRefEntry = new(asmRefPath, guid, referenceGuid);
                 if (!asmRefs.TryGetValue(referenceGuid, out var collection))
                 {
@@ -132,7 +124,7 @@ public partial class UnityProject : ProjectCollection
                 {
                     foreach (string value in pair.Value)
                     {
-                        unknownAsmDefReferences[value].Add(value);
+                        unknownAsmDefReferences[value].Add(pair.Key);
                     }
                 }
             }
@@ -189,6 +181,15 @@ public partial class UnityProject : ProjectCollection
             }
         }
         throw new InvalidDataException("Missing guid in meta file");
+    }
+
+    private static string ParseAsmGuid(string referenceString)
+    {
+        if (AsmGuidRegex().Match(referenceString) is not { Success: true } referenceGuidMatch)
+        {
+            throw new InvalidDataException();
+        }
+        return referenceGuidMatch.Groups["guid"].Value.ToLowerInvariant();
     }
 
     private record AsmDefEntry(string Path, string Guid, AsmDef Value);
