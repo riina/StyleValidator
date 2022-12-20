@@ -39,7 +39,7 @@ public partial class UnityProject : ProjectCollection
     [GeneratedRegex("file:(?<path>.+)")]
     private static partial Regex FileEntryRegex();
 
-    public override SolutionContext Load()
+    public override UnitySolutionContext Load()
     {
         var created = new List<ProjectFile>();
         List<string> asmDefPaths = new(), asmRefPaths = new();
@@ -167,16 +167,13 @@ public partial class UnityProject : ProjectCollection
                         tempProject.FailedDefines.Add(versionDefine.Define);
                     }
                 }
-                //var tempProjectFile = new TemporaryProjectFile(tempProject.DestinationCsprojPath);
-                //using var projectWriter = new StreamWriter(tempProjectFile.FileStream, leaveOpen: true);
-                var projectWriter = new StringWriter();
-                WriteProjectFile(projectWriter, tempProject);
-                Console.WriteLine(projectWriter.ToString());
-                // TODO
+                var tempProjectFile = new TemporaryProjectFile(tempProject.DestinationCsprojPath);
+                using (var projectWriter = new StreamWriter(tempProjectFile.FileStream, leaveOpen: true))
+                {
+                    WriteProjectFile(projectWriter, tempProject);
+                }
+                created.Add(tempProjectFile);
             }
-            var solutionWriter = new StringWriter();
-            WriteSolutionFile(solutionWriter, tempProjects.Values);
-            Console.WriteLine(solutionWriter.ToString());
         }
         catch (Exception e)
         {
@@ -198,7 +195,12 @@ public partial class UnityProject : ProjectCollection
             }
             throw;
         }
-        return new UnitySolutionContext(created.ToArray());
+        var tempSolutionFile = TemporarySolutionFile.CreateTemporaryProjectFile();
+        using (var solutionWriter = new StreamWriter(tempSolutionFile.FileStream, leaveOpen: true))
+        {
+            WriteSolutionFile(solutionWriter, tempProjects.Values);
+        }
+        return new UnitySolutionContext(tempSolutionFile, created.ToArray());
     }
 
     private static void WriteProjectFile(TextWriter writer, TempProjectData tempProject)

@@ -1,6 +1,6 @@
 namespace ProjectGenerator;
 
-public class TemporaryProjectFile : ProjectFile
+public class TemporarySolutionFile : SolutionFile
 {
     public FileStream FileStream
     {
@@ -8,7 +8,7 @@ public class TemporaryProjectFile : ProjectFile
         {
             if (_disposed)
             {
-                throw new ObjectDisposedException(nameof(TemporaryProjectFile));
+                throw new ObjectDisposedException(nameof(TemporarySolutionFile));
             }
             return _fileStream;
         }
@@ -17,7 +17,7 @@ public class TemporaryProjectFile : ProjectFile
     private readonly FileStream _fileStream;
     private bool _disposed;
 
-    public TemporaryProjectFile(string filePath) : base(filePath)
+    public TemporarySolutionFile(string filePath) : base(filePath)
     {
         _fileStream = new FileStream(filePath, FileMode.Create, FileAccess.ReadWrite, FileShare.Read, 4096, FileOptions.DeleteOnClose);
     }
@@ -38,10 +38,10 @@ public class TemporaryProjectFile : ProjectFile
         }
     }
 
-    public static TemporaryProjectFile CreateTemporaryProjectFile()
+    public static TemporarySolutionFile CreateTemporaryProjectFile()
     {
         string directory = Path.GetTempPath();
-        string filePath = Path.Combine(directory, $"{Guid.NewGuid()}.csproj");
-        return new TemporaryProjectFile(filePath);
+        string filePath = Path.Combine(directory, $"{Guid.NewGuid()}.sln");
+        return new TemporarySolutionFile(filePath);
     }
 }

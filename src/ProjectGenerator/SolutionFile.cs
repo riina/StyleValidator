@@ -1,8 +1,12 @@
 namespace ProjectGenerator;
 
-public abstract class SolutionContext : IDisposable
+public abstract class SolutionFile : IDisposable
 {
-    public abstract string Path { get; }
+    public string FilePath { get; }
+
+    public SolutionFile(string filePath) => FilePath = filePath;
+
+    public abstract Stream GetStream();
 
     protected virtual void Dispose(bool disposing)
     {

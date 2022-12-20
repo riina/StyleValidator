@@ -2,16 +2,45 @@ namespace ProjectGenerator.UnitySupport;
 
 public class UnitySolutionContext : SolutionContext
 {
-    private readonly ProjectFile[] _projectFiles;
-
-    public UnitySolutionContext(ProjectFile[] projectFiles)
+    public override string Path
     {
+        get
+        {
+            if (_disposed)
+            {
+                throw new ObjectDisposedException(nameof(UnitySolutionContext));
+            }
+            return _solutionFile.FilePath;
+        }
+    }
+
+    public IEnumerable<ProjectFile> ProjectFiles
+    {
+        get
+        {
+            if (_disposed)
+            {
+                throw new ObjectDisposedException(nameof(UnitySolutionContext));
+            }
+            return _projectFiles;
+        }
+    }
+
+    private readonly SolutionFile _solutionFile;
+    private readonly ProjectFile[] _projectFiles;
+    private bool _disposed;
+
+    public UnitySolutionContext(SolutionFile solutionFile, ProjectFile[] projectFiles)
+    {
+        _solutionFile = solutionFile;
         _projectFiles = projectFiles;
     }
 
     protected override void Dispose(bool disposing)
     {
         base.Dispose(disposing);
+        if (_disposed) return;
+        _disposed = true;
         if (disposing)
         {
             List<Exception> exc = new();

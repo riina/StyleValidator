@@ -6,6 +6,8 @@ public abstract class ProjectFile : IDisposable
 
     public ProjectFile(string filePath) => FilePath = filePath;
 
+    public abstract Stream GetStream();
+
     protected virtual void Dispose(bool disposing)
     {
     }
