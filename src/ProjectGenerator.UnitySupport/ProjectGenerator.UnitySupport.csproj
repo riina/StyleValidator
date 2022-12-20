@@ -10,5 +10,9 @@
   <ItemGroup>
     <ProjectReference Include="../ProjectGenerator/ProjectGenerator.csproj" />
   </ItemGroup>
+  
+  <ItemGroup>
+    <PackageReference Include="SemanticVersioning" Version="2.0.2" />
+  </ItemGroup>
 
 </Project>

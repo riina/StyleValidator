@@ -48,11 +48,21 @@ public partial class UnityProject : ProjectCollection
         Dictionary<string, List<string>> unknownAsmDefReferences = new();
         Dictionary<string, List<string>> asmDefReferencesInv = new();
         Dictionary<string, List<AsmRefEntry>> asmRefs = new();
+        Dictionary<string, SemanticVersioning.Version> versions = new();
         HashSet<string> keyPaths = new();
         try
         {
             foreach (var entry in _unityProjectPackageEntries)
             {
+                if (entry is LocalUnityProjectPackageEntry localUnityProjectPackageEntry)
+                {
+                    Package package;
+                    using (var stream = File.OpenRead(Path.Combine(localUnityProjectPackageEntry.FullPath, "package.json")))
+                    {
+                        package = JsonSerializer.Deserialize<Package>(stream) ?? throw new InvalidDataException();
+                    }
+                    versions.Add(package.Name, SemanticVersioning.Version.Parse(package.Version));
+                }
                 entry.ExtractProjectFiles(out var subAsmDefs, out var subAsmRefs);
                 asmDefPaths.AddRange(subAsmDefs);
                 asmRefPaths.AddRange(subAsmRefs);
@@ -128,19 +138,46 @@ public partial class UnityProject : ProjectCollection
             foreach (var asmDef in asmDefs.Values)
             {
                 var tempProject = tempProjects[asmDef.Guid];
+                // currently not supporting referenced assemblies
+                // currently not supporting referenced but unresolved asmdefs
                 tempProject.ReferencedCsprojPaths.AddRange(asmDefReferences[asmDef.Guid].Select(v => tempProjects[v.Guid].DestinationCsprojPath));
                 AddSourceFiles(asmDef.Path, keyPaths, tempProject.SourceFiles, "*.cs");
                 foreach (var asmRef in asmRefs[asmDef.Guid])
                 {
                     AddSourceFiles(asmRef.Path, keyPaths, tempProject.SourceFiles, "*.cs");
                 }
+                foreach (var versionDefine in asmDef.Value.VersionDefines)
+                {
+                    // currently not supporting referenced but unresolved packages
+                    if (versions.TryGetValue(versionDefine.Name, out var version))
+                    {
+                        if (IsVersionDefineSatisfied(versionDefine.Expression, version))
+                        {
+                            tempProject.Defines.Add(versionDefine.Define);
+                        }
+                        else
+                        {
+                            tempProject.FailedDefines.Add(versionDefine.Define);
+                        }
+                    }
+                    else
+                    {
+                        tempProject.FailedDefines.Add(versionDefine.Define);
+                    }
+                }
                 Console.WriteLine(asmDef.Path);
+                foreach (string define in tempProject.Defines)
+                {
+                    Console.WriteLine(" +" + define);
+                }
+                foreach (string define in tempProject.FailedDefines)
+                {
+                    Console.WriteLine(" -" + define);
+                }
                 foreach (string file in tempProject.SourceFiles)
                 {
-                    Console.WriteLine(" " + file);
+                    Console.WriteLine(" >" + file);
                 }
-                // currently not supporting referenced assemblies
-                // currently not supporting referenced but unresolved asmdefs
                 // TODO process defines
             }
         }
@@ -166,6 +203,68 @@ public partial class UnityProject : ProjectCollection
         }
         return new UnitySolutionContext(created.ToArray());
     }
+
+    private static bool IsVersionDefineSatisfied(string versionDefineExpression, SemanticVersioning.Version existingVersion)
+    {
+        // https://docs.unity3d.com/2022.2/Documentation/Manual/ScriptCompilationAssemblyDefinitionFiles.html#version-define-expressions
+        if (VersionDefineRangeRegex().Match(versionDefineExpression) is { Success: true } versionDefineRangeRegex)
+        {
+            bool minExc = versionDefineRangeRegex.Groups["leftBoundType"].Value == "(";
+            bool maxExc = versionDefineRangeRegex.Groups["rightBoundType"].Value == ")";
+            var left = SemanticVersioning.Version.Parse(versionDefineRangeRegex.Groups["left"].Value);
+            var right = SemanticVersioning.Version.Parse(versionDefineRangeRegex.Groups["right"].Value);
+            if (minExc)
+            {
+                if (existingVersion <= left)
+                {
+                    return false;
+                }
+            }
+            else
+            {
+                if (existingVersion < left)
+                {
+                    return false;
+                }
+            }
+            if (maxExc)
+            {
+                if (existingVersion >= right)
+                {
+                    return false;
+                }
+            }
+            else
+            {
+                if (existingVersion > right)
+                {
+                    return false;
+                }
+            }
+            return false;
+            // TODO
+        }
+        if (VersionDefineExactRegex().Match(versionDefineExpression) is { Success: true } versionDefineExactRegex)
+        {
+            var define = SemanticVersioning.Version.Parse(versionDefineExactRegex.Groups["value"].Value);
+            return existingVersion == define;
+        }
+        if (VersionDefineShortcutRegex().Match(versionDefineExpression) is { Success: true } versionDefineShortcutRegex)
+        {
+            var define = SemanticVersioning.Version.Parse(versionDefineShortcutRegex.Groups["value"].Value);
+            return existingVersion >= define;
+        }
+        throw new InvalidDataException();
+    }
+
+    [GeneratedRegex(@"(?<leftBoundType>[\[\(])\s*(?<left>\S+?)\s*,\s*(?<right>\S+)\s*(?<rightBoundType>[\]\)])")]
+    private static partial Regex VersionDefineRangeRegex();
+
+    [GeneratedRegex(@"\[\s*(?<value>\S+)\s*\]")]
+    private static partial Regex VersionDefineExactRegex();
+
+    [GeneratedRegex(@"(?<value>\S+)")]
+    private static partial Regex VersionDefineShortcutRegex();
 
     private static void AddSourceFiles(string directory, IReadOnlySet<string> keyPaths, ICollection<string> paths, string searchPattern)
     {
