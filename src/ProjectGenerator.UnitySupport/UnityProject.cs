@@ -92,7 +92,7 @@ public partial class UnityProject : ProjectCollection
                     collection.Add(guid);
                 }
                 asmRefs.Add(guid, new List<AsmRefEntry>());
-                tempProjects.Add(guid, new TempProjectData(GenerateTempPath(guid, ".csproj")));
+                tempProjects.Add(guid, new TempProjectData(asmDef.Name, GenerateTempPath(guid, ".csproj")));
             }
             foreach (string asmRefPath in asmRefPaths)
             {
@@ -168,62 +168,15 @@ public partial class UnityProject : ProjectCollection
                     }
                 }
                 //var tempProjectFile = new TemporaryProjectFile(tempProject.DestinationCsprojPath);
-                //using var writer = new StreamWriter(tempProjectFile.FileStream, leaveOpen: true);
-                var writer = new StringWriter();
-                writer.WriteLine("""
-                <Project Sdk="Microsoft.NET.Sdk">
-
-                  <PropertyGroup>
-                    <TargetFramework>netstandard2.1</TargetFramework>
-                    <LangVersion>9</LangVersion>
-                  </PropertyGroup>
-                """);
-                if (tempProject.Defines.Count != 0)
-                {
-                    string defineConstantsString = new StringBuilder().AppendJoin(";", tempProject.Defines).ToString();
-                    writer.WriteLine($"""
-
-                  <PropertyGroup>
-                    <DefineConstants>{defineConstantsString}</DefineConstants>
-                  </PropertyGroup>
-                """);
-                }
-                if (tempProject.ReferencedCsprojPaths.Count != 0)
-                {
-                    writer.WriteLine("""
-
-                  <ItemGroup>
-                """);
-                    foreach (string referencedCsprojPath in tempProject.ReferencedCsprojPaths)
-                    {
-                        writer.WriteLine($"""
-                    <ProjectReference Include="{referencedCsprojPath}"/>
-                """);
-                    }
-                    writer.WriteLine("""
-                  </ItemGroup>
-                """);
-                }
-                writer.WriteLine("""
-
-                  <ItemGroup>
-                """);
-                foreach (string sourceFile in tempProject.SourceFiles)
-                {
-                    writer.WriteLine($"""
-                    <Compile Include="{sourceFile}"/>
-                """);
-                }
-                writer.WriteLine("""
-                  </ItemGroup>
-                """);
-                writer.WriteLine("""
-
-                </Project>
-                """);
-                Console.WriteLine(writer.ToString());
+                //using var projectWriter = new StreamWriter(tempProjectFile.FileStream, leaveOpen: true);
+                var projectWriter = new StringWriter();
+                WriteProjectFile(projectWriter, tempProject);
+                Console.WriteLine(projectWriter.ToString());
                 // TODO
             }
+            var solutionWriter = new StringWriter();
+            WriteSolutionFile(solutionWriter, tempProjects.Values);
+            Console.WriteLine(solutionWriter.ToString());
         }
         catch (Exception e)
         {
@@ -246,6 +199,109 @@ public partial class UnityProject : ProjectCollection
             throw;
         }
         return new UnitySolutionContext(created.ToArray());
+    }
+
+    private static void WriteProjectFile(TextWriter writer, TempProjectData tempProject)
+    {
+        writer.WriteLine("""
+                <Project Sdk="Microsoft.NET.Sdk">
+
+                  <PropertyGroup>
+                    <TargetFramework>netstandard2.1</TargetFramework>
+                    <LangVersion>9</LangVersion>
+                  </PropertyGroup>
+                """);
+        if (tempProject.Defines.Count != 0)
+        {
+            string defineConstantsString = new StringBuilder().AppendJoin(";", tempProject.Defines).ToString();
+            writer.WriteLine($"""
+
+                  <PropertyGroup>
+                    <DefineConstants>{defineConstantsString}</DefineConstants>
+                  </PropertyGroup>
+                """);
+        }
+        if (tempProject.ReferencedCsprojPaths.Count != 0)
+        {
+            writer.WriteLine("""
+
+                  <ItemGroup>
+                """);
+            foreach (string referencedCsprojPath in tempProject.ReferencedCsprojPaths)
+            {
+                writer.WriteLine($"""
+                    <ProjectReference Include="{referencedCsprojPath}"/>
+                """);
+            }
+            writer.WriteLine("""
+                  </ItemGroup>
+                """);
+        }
+        writer.WriteLine("""
+
+                  <ItemGroup>
+                """);
+        foreach (string sourceFile in tempProject.SourceFiles)
+        {
+            writer.WriteLine($"""
+                    <Compile Include="{sourceFile}"/>
+                """);
+        }
+        writer.WriteLine("""
+                  </ItemGroup>
+                """);
+        writer.WriteLine("""
+
+                </Project>
+                """);
+    }
+
+    private static void WriteSolutionFile(TextWriter writer, IEnumerable<TempProjectData> projects)
+    {
+        List<KeyValuePair<TempProjectData, Guid>> pairs = new();
+        foreach (var project in projects)
+        {
+            pairs.Add(new KeyValuePair<TempProjectData, Guid>(project, Guid.NewGuid()));
+        }
+        writer.WriteLine("""
+        Microsoft Visual Studio Solution File, Format Version 12.00
+        # Visual Studio Version 17
+        VisualStudioVersion = 17.0.31903.59
+        MinimumVisualStudioVersion = 10.0.40219.1
+        """);
+        foreach (var pair in pairs)
+        {
+            string guidString = pair.Value.ToString("D");
+            writer.WriteLine($$"""
+        Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "{{pair.Key.Name}}", "{{pair.Key.DestinationCsprojPath}}", "{{guidString}}"
+        EndProject
+        """);
+        }
+        writer.WriteLine("""
+        Global
+            GlobalSection(SolutionConfigurationPlatforms) = preSolution
+                Debug|Any CPU = Debug|Any CPU
+                Release|Any CPU = Release|Any CPU
+            EndGlobalSection
+            GlobalSection(SolutionProperties) = preSolution
+                HideSolutionNode = FALSE
+            EndGlobalSection
+            GlobalSection(ProjectConfigurationPlatforms) = postSolution
+        """);
+        foreach (var pair in pairs)
+        {
+            string guidString = pair.Value.ToString("D");
+            writer.WriteLine($$"""
+                {{{guidString}}}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+                {{{guidString}}}.Debug|Any CPU.Build.0 = Debug|Any CPU
+                {{{guidString}}}.Release|Any CPU.ActiveCfg = Release|Any CPU
+                {{{guidString}}}.Release|Any CPU.Build.0 = Release|Any CPU
+            """);
+        }
+        writer.WriteLine("""
+            EndGlobalSection
+        EndGlobal
+        """);
     }
 
     private static bool IsVersionDefineSatisfied(string versionDefineExpression, SemanticVersioning.Version existingVersion)

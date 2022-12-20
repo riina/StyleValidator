@@ -2,6 +2,7 @@ namespace ProjectGenerator.UnitySupport;
 
 internal class TempProjectData
 {
+    public string Name { get; }
     public string DestinationCsprojPath { get; }
 
     public List<string> ReferencedCsprojPaths { get; }
@@ -12,8 +13,9 @@ internal class TempProjectData
 
     public List<string> FailedDefines { get; }
 
-    public TempProjectData(string destinationCsprojPath)
+    public TempProjectData(string name, string destinationCsprojPath)
     {
+        Name = name;
         DestinationCsprojPath = destinationCsprojPath;
         ReferencedCsprojPaths = new List<string>();
         SourceFiles = new List<string>();
